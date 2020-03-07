@@ -42,7 +42,7 @@ def load_data(file_name):
   return t,features,linear_velocity,rotational_velocity,K,b,cam_T_imu
 
 
-def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False):
+def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False, save_pth=None):
   '''
   function to visualize the trajectory in 2D
   Input:
@@ -71,5 +71,9 @@ def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False):
   ax.axis('equal')
   ax.grid(False)
   ax.legend()
+
+  # save figure to disk
+  if save_pth is not None:
+      plt.savefig(save_pth)
   plt.show(block=True)
   return fig, ax

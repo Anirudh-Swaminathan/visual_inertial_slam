@@ -14,6 +14,11 @@ class IMU(object):
         Constructor for IMU Class
         """
         self.mean = np.identity(4)
+
+        # history of IMU Inverse means
+        self.inv_history = []
+
+        # IMU Mean poses over time
         self.traj = []
 
     @staticmethod
@@ -37,8 +42,7 @@ class IMU(object):
         ret_mat[2][1] = vec_3d[0]
         return ret_mat
 
-    @staticmethod
-    def control_hat(control_inp):
+    def control_hat(self, control_inp):
         """
         Computes the hat for the control input useful in EKF prediction step for IMU
         :param control_inp: Odometry reading of IMU. It is R^6, with linear velocity followed by angular velocity
@@ -48,12 +52,31 @@ class IMU(object):
         ang_v = control_inp[-3:]
 
         # angular velocity hat
-        ang_v_hat = skew_symm_3D(ang_v)
+        ang_v_hat = self.skew_symm_3D(ang_v)
 
         # final return matrix
         ret_mat = np.zeros((4, 4))
-        ret_mat[:3, :3] = ang_v_hat
-        ret_mat[3][:3] = lin_v
+        ret_mat[:3, :3] = np.copy(ang_v_hat)
+        ret_mat[:3, 3] = np.copy(lin_v)
+        return ret_mat
+
+    @staticmethod
+    def get_pose_from_inv(inv_pose):
+        """
+        Invert the Inverse Pose U of IMU to get T at time t
+        :return:
+        """
+        # print(inv_pose.shape)
+        ret_mat = np.zeros((4, 4))
+        R = inv_pose[:3, :3]
+        Rt = np.transpose(R)
+        # print(inv_pose[:3, 3].shape)
+        p = inv_pose[:3, 3]
+        p = p.reshape((3, 1))
+        p_n = -1.0 * np.matmul(Rt, p)
+        ret_mat[:3, :3] = np.copy(Rt)
+        ret_mat[:3, 3] = np.copy(p_n.flatten())
+        ret_mat[3, 3] = 1
         return ret_mat
 
     def dead_reckon(self, control_inp, time):
@@ -64,11 +87,22 @@ class IMU(object):
         :param time: time discretization parameter - tau
         :return:
         """
-        self.traj.append(np.copy(self.mean))
+        self.inv_history.append(np.copy(self.mean))
+        mp = self.get_pose_from_inv(self.mean)
+        self.traj.append(np.copy(mp))
         u_hat = self.control_hat(control_inp)
         fin_map = -1.0 * time * u_hat
         exp_map = expm(fin_map)
         self.mean = np.matmul(exp_map, self.mean)
+
+    def get_history(self):
+        """
+        return the history of IMU Inverse Poses
+        :return:
+        """
+        ret = list(self.inv_history)
+        ret.append(np.copy(self.mean))
+        return ret
 
     def get_path(self):
         """
@@ -76,8 +110,20 @@ class IMU(object):
         :return:
         """
         ret = list(self.traj)
-        ret.append(np.copy(self.mean))
+        # append mean pose
+        mean_pose = self.get_pose_from_inv(self.mean)
+        ret.append(np.copy(mean_pose))
         return ret
+
+    def save_history(self, pth):
+        """
+        Save tht IMU inverse poses history over all time steps so far
+        :param pth: file path to save the history to
+        :return:
+        """
+        hist = self.get_history()
+        t = np.array(hist)
+        np.save(pth, t)
 
     def save_path(self, pth):
         """
