@@ -42,6 +42,32 @@ class LandMarks(object):
         self.cur_init = np.logical_and(self.current_inds, np.logical_not(self.observed_inds))
         self.observed_inds = np.logical_or(self.current_inds, self.observed_inds)
 
-    def update(self, z_t):
-        self._update_inds(z_t)
+    def _init_means(self, z_t, c_mat, cam_T_imu, imu_pose):
+        """
+        Initialize the means for the newly observed landmarks using the inverse of Stereo Camera Observation model
+        :param z_t: left and right camera pixel coordinates
+        :param c_mat: the calibration matrix of camera
+        :param cam_T_imu: pose of IMU in Camera frame
+        :return:
+        """
+        uls = z_t[0, :]
+        vls = z_t[1, :]
+        urs = z_t[2, :]
+        ds = uls - urs
+        z = c_mat[2][3] / ds
+        x = (uls - (c_mat[0][2])) * z / c_mat[0][0]
+        y = (vls - (c_mat[1][2])) * z / c_mat[1][1]
+        opt_homo = x.reshape((1, x.size))
+        opt_homo = np.dstack((opt_homo, y.reshape((1, y.size))))
+        opt_homo = np.dstack((opt_homo, z.reshape((1, z.size))))
+        opt_homo = np.dstack((opt_homo, np.ones((1, z.size))))
+        imu_frame = np.matmul(np.transpose(cam_T_imu), opt_homo)
+        world_frame = np.matmul(imu_pose, imu_frame)
+        assert(world_frame.shape[1] == np.sum(self.cur_init))
+        mean_2d = np.copy(self.means.reshape((3, self.means.shape[0]/3)))
+        mean_2d[:, self.cur_init] = np.copy(world_frame[:3, :])
+        self.means = np.copy(mean_2d.reshape(self.means.shape))
 
+    def update(self, z_t, c_mat, cam_T_imu, imu_pose):
+        self._update_inds(z_t)
+        self._init_means(z_t, c_mat, cam_T_imu, imu_pose)

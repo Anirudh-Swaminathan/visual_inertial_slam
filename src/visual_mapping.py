@@ -37,7 +37,8 @@ if __name__ == '__main__':
 
         # current observations
         z_t = features[:, :, ti]
-        lms.update(z_t, tau, cur_inv_pose)
+        # TODO - c_mat from baseline and K
+        lms.update(z_t, c_mat, cam_T_imu, cur_pose)
 
         if ti % 500 == 0 or ti == 1:
             # save landmark means and covariances
