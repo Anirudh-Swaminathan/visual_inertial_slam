@@ -42,7 +42,7 @@ def load_data(file_name):
   return t,features,linear_velocity,rotational_velocity,K,b,cam_T_imu
 
 
-def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False, save_pth=None):
+def visualize_trajectory_2d(pose,landmarks=None,path_name="Unknown",show_ori=False, save_pth=None):
   '''
   function to visualize the trajectory in 2D
   Input:
@@ -52,9 +52,9 @@ def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False, save_pth=No
   '''
   fig,ax = plt.subplots(figsize=(5,5))
   n_pose = pose.shape[2]
-  ax.plot(pose[0,3,:],pose[1,3,:],'r-',label=path_name)
-  ax.scatter(pose[0,3,0],pose[1,3,0],marker='s',label="start")
-  ax.scatter(pose[0,3,-1],pose[1,3,-1],marker='o',label="end")
+  ax.plot(pose[0,3,:],pose[1,3,:],'r-',label=path_name, zorder=4)
+  ax.scatter(pose[0,3,0],pose[1,3,0],marker='s',label="start", zorder=3)
+  ax.scatter(pose[0,3,-1],pose[1,3,-1],marker='o',label="end", zorder=2)
   if show_ori:
       select_ori_index = list(range(0,n_pose,max(int(n_pose/50), 1)))
       yaw_list = []
@@ -66,6 +66,13 @@ def visualize_trajectory_2d(pose,path_name="Unknown",show_ori=False, save_pth=No
       dx,dy = [dx,dy]/np.sqrt(dx**2+dy**2)
       ax.quiver(pose[0,3,select_ori_index],pose[1,3,select_ori_index],dx,dy,\
           color="b",units="xy",width=1)
+
+  if landmarks is not None:
+      print("In Visualize Trajectory!")
+      print(landmarks.shape)
+      lxs = landmarks[0, :]
+      lys = landmarks[1, :]
+      ax.scatter(lxs, lys, marker=".", color="green", label="landmarks", zorder=1)
   ax.set_xlabel('x')
   ax.set_ylabel('y')
   ax.axis('equal')
