@@ -19,7 +19,7 @@ if __name__ == '__main__':
     print(K)
     print(c_mat)
 
-    save_base = "./outputs/visual_mapping/d0034/try_001/"
+    save_base = "./outputs/visual_mapping_dr/d0034/try_001/"
 
     imu_base = "outputs/dead_reckoning/d0034/try_001/"
     imu_poses = np.load(imu_base + "path_" + str(t.shape[1]) + ".npy")
