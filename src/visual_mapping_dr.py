@@ -19,9 +19,9 @@ if __name__ == '__main__':
     print(K)
     print(c_mat)
 
-    save_base = "./outputs/visual_mapping_dr/d0034/try_001/"
+    save_base = "./outputs/visual_mapping_dr/d0034/try_002/"
 
-    imu_base = "outputs/dead_reckoning/d0034/try_001/"
+    imu_base = "outputs/dead_reckoning/d0034/try_002/"
     imu_poses = np.load(imu_base + "path_" + str(t.shape[1]) + ".npy")
     imu_inv_poses = np.load(imu_base + "hist_" + str(t.shape[1]) + ".npy")
     print(imu_poses.shape)
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             assert (np.sum(np.abs(old_start - new_start)) <= 1e-6)
             # assert (world_T_imu.shape[2] == t.shape[1])
             land_means = lms.get_obs_means()
-            visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0034", show_ori=False,
+            visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0034", show_ori=True,
                                     save_pth=save_base + "map_img_" + str(ti) + ".png")
 
     # final save
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     assert (np.sum(np.abs(old_start - new_start)) <= 1e-6)
     # assert (world_T_imu.shape[2] == t.shape[1])
     land_means = lms.get_obs_means()
-    visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0034", show_ori=False,
+    visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0034", show_ori=True,
                             save_pth=save_base + "map_img_" + str(t.shape[1]) + ".png")
 
     # (a) IMU Localization via EKF Prediction

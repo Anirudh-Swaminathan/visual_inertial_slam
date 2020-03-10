@@ -65,7 +65,7 @@ def visualize_trajectory_2d(pose,landmarks=None,path_name="Unknown",show_ori=Fal
       dy = np.sin(yaw_list)
       dx,dy = [dx,dy]/np.sqrt(dx**2+dy**2)
       ax.quiver(pose[0,3,select_ori_index],pose[1,3,select_ori_index],dx,dy,\
-          color="b",units="xy",width=1)
+          color="b",units="xy",width=1, zorder=2)
 
   if landmarks is not None:
       print("In Visualize Trajectory!")
