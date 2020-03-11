@@ -13,7 +13,10 @@ class IMU(object):
         """
         Constructor for IMU Class
         """
+        # initialize the mean, covariance and the noise
         self.mean = np.identity(4)
+        self.cov = 0.1 * np.identity(6)
+        self.W = 1e-4 * np.identity(6)
 
         # history of IMU Inverse means
         self.inv_history = []
@@ -60,6 +63,30 @@ class IMU(object):
         ret_mat[:3, 3] = np.copy(lin_v)
         return ret_mat
 
+    def curly_hat(self, control_inp):
+        """
+        Computes the curly hat for the control input, useful in EKF prediction step for IMU
+        :param control_inp: Odometry reading of IMU. It is R^6, with linear velocity followed by angular velocity
+        :return: control_curly
+        """
+        lin_v = control_inp[:3]
+        ang_v = control_inp[-3:]
+
+        # angular velocity hat
+        ang_v_hat = self.skew_symm_3D(ang_v)
+
+        # linear velocity hat
+        lin_v_hat = self.skew_symm_3D(lin_v)
+
+        # final return matrix
+        ret_mat = np.zeros((6, 6))
+        # block row 1
+        ret_mat[:3, :3] = np.copy(ang_v_hat)
+        ret_mat[:3, 3:] = np.copy(lin_v_hat)
+        # block row 2
+        ret_mat[3:, 3:] = np.copy(ang_v_hat)
+        return ret_mat
+
     @staticmethod
     def get_pose_from_inv(inv_pose):
         """
@@ -94,6 +121,38 @@ class IMU(object):
         fin_map = -1.0 * time * u_hat
         exp_map = expm(fin_map)
         self.mean = np.matmul(exp_map, self.mean)
+
+    def predict(self, control_inp, time):
+        """
+        Performs the EKF predict step on the IMU
+        :param control_inp: the control input as linear velocity and angular velocity
+        :param time: the time discretization
+        :return:
+        """
+        # print("Previous mean and cov")
+        # print(self.mean)
+        # print(self.cov)
+        self.inv_history.append(np.copy(self.mean))
+        mp = self.get_pose_from_inv(self.mean)
+        self.traj.append(np.copy(mp))
+
+        # mean update
+        u_hat = self.control_hat(control_inp)
+        f_map = -1.0 * time * u_hat
+        e_map = expm(f_map)
+        self.mean = np.matmul(e_map, self.mean)
+
+        # covariance update
+        u_curly = self.curly_hat(control_inp)
+        fin_map = -1.0 * time * u_curly
+        exp_map = expm(fin_map)
+        rit = np.matmul(self.cov, np.transpose(exp_map))
+        term1 = np.matmul(exp_map, rit)
+        assert(term1.shape == self.W.shape)
+        self.cov = np.copy(term1 + self.W)
+        # print("Updated Mean and cov")
+        # print(self.mean)
+        # print(self.cov)
 
     def get_history(self):
         """
@@ -134,3 +193,11 @@ class IMU(object):
         traj = self.get_path()
         t = np.array(traj)
         np.save(pth, t)
+
+    def save_cov(self, pth):
+        """
+        Save the covariance of the inverse IMU pose at time t
+        :param pth: file path to save the covariance to
+        :return:
+        """
+        np.save(pth, self.cov)

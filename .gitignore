@@ -219,3 +219,6 @@ tags
 .vim
 
 # End of https://www.gitignore.io/api/vim,python,pycharm+all
+#
+# ignore generated .npy files in outputs
+*.npy

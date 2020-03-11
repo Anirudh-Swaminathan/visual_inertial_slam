@@ -63,14 +63,14 @@ class LandMarks(object):
         :param cam_T_imu: pose of IMU in Camera frame
         :return:
         """
-        print("In _init_means")
+        # print("In _init_means")
         num_new = np.sum(self.cur_init)
-        print(num_new, np.sum(self.observed_inds), np.sum(self.current_inds))
+        # print(num_new, np.sum(self.observed_inds), np.sum(self.current_inds))
 
         # return if no initializations are required
         if num_new == 0:
             return
-        print(z_t.shape)
+        # print(z_t.shape)
         uls = z_t[0, self.cur_init]
         vls = z_t[1, self.cur_init]
         urs = z_t[2, self.cur_init]
@@ -133,9 +133,9 @@ class LandMarks(object):
         :param imu_pose: Pose of IMU in world frame
         :return:
         """
-        print("In Update landmarks!")
+        # print("In Update landmarks!")
         num_upds = np.sum(self.cur_upds)
-        print(num_upds, np.sum(self.observed_inds), np.sum(self.current_inds))
+        # print(num_upds, np.sum(self.observed_inds), np.sum(self.current_inds))
         if num_upds == 0:
             return
         # Construct the required M - 4*4
@@ -179,7 +179,7 @@ class LandMarks(object):
         Nt = np.sum(self.current_inds)
         Ht = np.zeros((4*Nt, 3*self.M))
         inds = np.where(self.cur_upds == True)[0]
-        print(inds)
+        # print(inds)
         for i in range(len(inds)):
             dpq = self._projective_derivative(q[:, inds[i]])
             assert(dpq.shape == M.shape)
