@@ -42,7 +42,7 @@ def load_data(file_name):
   return t,features,linear_velocity,rotational_velocity,K,b,cam_T_imu
 
 
-def visualize_trajectory_2d(pose,landmarks=None,path_name="Unknown",show_ori=False, save_pth=None):
+def visualize_trajectory_2d(pose,dead_means=None,landmarks=None,path_name="Unknown",show_ori=False, save_pth=None):
   '''
   function to visualize the trajectory in 2D
   Input:
@@ -67,12 +67,17 @@ def visualize_trajectory_2d(pose,landmarks=None,path_name="Unknown",show_ori=Fal
       ax.quiver(pose[0,3,select_ori_index],pose[1,3,select_ori_index],dx,dy,\
           color="b",units="xy",width=1, zorder=2)
 
+  if dead_means is not None:
+      print(dead_means.shape)
+      dxs = dead_means[0, :]
+      dys = dead_means[1, :]
+      ax.scatter(dxs, dys, marker=".", color="yellow", label="initial landmarks", zorder=1)
   if landmarks is not None:
       print("In Visualize Trajectory!")
       print(landmarks.shape)
       lxs = landmarks[0, :]
       lys = landmarks[1, :]
-      ax.scatter(lxs, lys, marker=".", color="green", label="landmarks", zorder=1)
+      ax.scatter(lxs, lys, marker=".", color="green", label="updated landmarks", zorder=1)
   ax.set_xlabel('x')
   ax.set_ylabel('y')
   ax.axis('equal')

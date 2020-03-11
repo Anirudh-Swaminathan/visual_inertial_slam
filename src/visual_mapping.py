@@ -37,7 +37,11 @@ if __name__ == '__main__':
     print(imu_poses.shape)
 
     # recover the dead reckoned landmark points
-    dead_map_base = "outputs/visual_mapping_dr/d0027/try_001/"
+    dead_map_base = "outputs/visual_mapping_dr/d0027/try_001/landmarks_"
+    dead_map = np.load(dead_map_base + str(t.shape[1]) + "_means.npy")
+    dead_map = dead_map[:, new_inds]
+    print(dead_map.shape)
+    assert(dead_map.shape[1] == features.shape[1])
 
     # instantiate landmarks
     # M - Number of landmarks
@@ -83,7 +87,8 @@ if __name__ == '__main__':
             print("So far observed landmarks!!")
             print("Covariances are shaped as ", land_covs.shape)
             # print(land_covs)
-            visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0027", show_ori=True,
+            visualize_trajectory_2d(world_T_imu, dead_means=dead_map[:, :land_means.shape[1]], landmarks=land_means,
+                                    path_name="mp_0027", show_ori=True,
                                     save_pth=save_base + "map_img_" + str(ti) + ".png")
 
     # final save
@@ -102,7 +107,7 @@ if __name__ == '__main__':
     assert (np.sum(np.abs(old_start - new_start)) <= 1e-6)
     # assert (world_T_imu.shape[2] == t.shape[1])
     land_means = lms.get_obs_means()
-    visualize_trajectory_2d(world_T_imu, landmarks=land_means, path_name="mp_0027", show_ori=True,
+    visualize_trajectory_2d(world_T_imu, dead_means=dead_map, landmarks=land_means, path_name="mp_0027", show_ori=True,
                             save_pth=save_base + "map_img_" + str(t.shape[1]) + ".png")
 
     # (a) IMU Localization via EKF Prediction
