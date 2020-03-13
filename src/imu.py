@@ -154,6 +154,112 @@ class IMU(object):
         # print(self.mean)
         # print(self.cov)
 
+    def _projective_derivative(self, q):
+        """
+        Returns the matrix representing the differentiation of the projection function
+        :param q: the homogeneous coordinate to take the derivative for
+        :return:
+        """
+        ret = np.identity(4)
+        ret[:, 2] -= 1.0 * q / q[2]
+        return 1.0/q[2] * ret
+
+    def _con_dot(self, s):
+        """
+        Computes the Concetric Circle dot as described in lecture 13, slide 18
+        :param p:
+        :return:
+        """
+        s = s.flatten()
+        s3 = s[:3]
+        s_hat = self.skew_symm_3D(s3)
+        ret_mat = np.zeros((4, 6))
+        ret_mat[:3, :3] = np.identity(3)
+        ret_mat[:3, 3:] = np.copy(-1.0 * s_hat)
+        return ret_mat
+
+    def get_jacobian(self, cam_T_imu, landmarks, M):
+        """
+        Returns the Jacobian of the IMU wrt each observation
+        :param cam_T_imu:
+        :param landmarks:
+        :param M:
+        :return:
+        """
+        # Set up the Jacobian
+        Nt = landmarks.shape[1]
+        Ht = np.zeros((4 * Nt, 6))
+
+        # TUt - 4*4
+        tut = np.matmul(cam_T_imu, self.mean)
+        assert (tut.shape == M.shape)
+
+        # inside the projective derivative
+        q = np.matmul(tut, landmarks)
+
+        # inside the concentric circle dot
+        in_dot = np.matmul(self.mean, landmarks)
+
+        # loop through all the observed landmarks at time t
+        for i in range(landmarks.shape[1]):
+            dpq = self._projective_derivative(q[:, i])
+            assert (dpq.shape == M.shape)
+            r_dot = self._con_dot(in_dot[:, i])
+            r = np.matmul(cam_T_imu, r_dot)
+            mid = np.matmul(dpq, r)
+            htii = np.matmul(M, mid)
+            Ht[i*4:(i+1)*4, :] = np.copy(htii)
+        assert(Ht.shape == (4*Nt, 6))
+        return Ht
+
+    def update_separate(self, z_t, z_tbar, M, cam_T_imu, landmarks):
+        """
+        Performs the EKF update step on the IMU mean and Covariance using the input observations and landmarks separately
+        :param z_t: Observations at current time step
+        :param z_tbar: Computed predicted observation - useful for the Innovation term
+        :param M: the stereo camera calibration matrix
+        :param cam_T_imu: transforms IMU frame to the camera frame, i.e, IMU to optical frame
+        :param landmarks: the current landmark means to use in the EKF update step
+        :return:
+        """
+        Nt = landmarks.shape[1]
+        fzt = z_t.reshape(z_t.size, 1)
+        fztb = z_tbar.reshape(z_tbar.size, 1)
+
+        # Jacobian wrt IMU
+        Ht = self.get_jacobian(cam_T_imu, landmarks, M)
+
+        # Kalman Gain
+        # Set up the covariance as a block diagonal Noise
+        IV = np.identity(4 * Nt)
+        sigmaH = np.matmul(self.cov, np.transpose(Ht))
+        assert (sigmaH.shape[0] == 6)
+        assert (sigmaH.shape[1] == 4 * Nt)
+        hsh = np.matmul(Ht, sigmaH)
+        assert (hsh.shape == (4 * Nt, 4 * Nt))
+        inside_inv = hsh + IV
+        assert (IV.shape == (4 * Nt, 4 * Nt))
+        assert (inside_inv.shape == (4 * Nt, 4 * Nt))
+        ro = np.linalg.inv(inside_inv)
+        mido = np.matmul(np.transpose(Ht), ro)
+        assert (mido.shape == (6, 4 * Nt))
+        Kt = np.matmul(self.cov, mido)
+        assert (Kt.shape == (6, 4 * Nt))
+
+        # Mean update
+        adt = np.matmul(Kt, (fzt - fztb))
+        assert(adt.shape == (6, 1))
+        adt = adt.flatten()
+        hat_kz = self.control_hat(adt)
+        exp_kx = expm(hat_kz)
+        self.mean = np.matmul(exp_kx, self.mean)
+
+        # Covariance Update
+        ktht = np.matmul(Kt, Ht)
+        assert (ktht.shape == (6, 6))
+        I = np.identity(6)
+        self.cov = np.matmul((I - ktht), self.cov)
+
     def get_history(self):
         """
         return the history of IMU Inverse Poses

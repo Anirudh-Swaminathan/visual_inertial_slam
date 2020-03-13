@@ -124,7 +124,7 @@ class LandMarks(object):
         ret[:, 2] -= 1.0 * q / q[2]
         return 1.0/q[2] * ret
 
-    def _update_landmarks(self, z_t, c_mat, cam_T_imu, imu_pose):
+    def _update_landmarks(self, z_t, c_mat, cam_T_imu, imu_pose, Imu):
         """
         Function to update the already observed landmarks in this time step
         :param z_t: Current time observations
@@ -174,6 +174,9 @@ class LandMarks(object):
         z_tbar = np.matmul(M, pq)
         assert(z_tbar.shape == (4, self.M))
         assert(np.sum(np.abs(z_tbar[1, :] - z_tbar[3, :])) < 1e-6)
+
+        Imu.update_separate(z_t[:, self.current_inds].flatten('F'), z_tbar[:, self.current_inds].flatten('F'),
+                        M, cam_T_imu, mubt[:, self.current_inds])
 
         # set up Jacobian - 4Nt * 3M
         Nt = np.sum(self.current_inds)
@@ -225,10 +228,10 @@ class LandMarks(object):
         I = np.identity(3*self.M)
         self.covs = np.matmul((I - ktht), self.covs)
 
-    def update(self, z_t, c_mat, cam_T_imu, imu_pose):
+    def update(self, z_t, c_mat, cam_T_imu, imu_pose, Imu):
         self._update_inds(z_t)
         self._init_landmarks(z_t, c_mat, cam_T_imu, imu_pose)
-        self._update_landmarks(z_t, c_mat, cam_T_imu, imu_pose)
+        self._update_landmarks(z_t, c_mat, cam_T_imu, imu_pose, Imu)
 
     def get_obs_means(self):
         """
