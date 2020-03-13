@@ -1,0 +1,7 @@
+IMU
+ - W     = 1e-4 I
+ - Sigma = 0.01 I
+
+Landmarks
+ - V     = 15 I
+ - Sigma = 1e-2 I

@@ -16,7 +16,12 @@ class LandMarks(object):
         """
         self.M = m
         self.means = np.zeros((3 * self.M, 1))
-        self.covs = np.zeros((3 * self.M, 3 * self.M))
+
+        # total covariance
+        self.covs = np.zeros((3 * self.M + 6, 3 * self.M + 6))
+
+        # just the IMU covariance
+        self.covs[-6:, -6:] = 0.1 * np.identity(6)
         # self.covs = np.identity(3*self.M)
 
         # boolean array to keep track of all the observed landmarks till time t
@@ -175,12 +180,14 @@ class LandMarks(object):
         assert(z_tbar.shape == (4, self.M))
         assert(np.sum(np.abs(z_tbar[1, :] - z_tbar[3, :])) < 1e-6)
 
-        Imu.update_separate(z_t[:, self.current_inds].flatten('F'), z_tbar[:, self.current_inds].flatten('F'),
-                        M, cam_T_imu, mubt[:, self.current_inds])
+        # Imu.update_separate(z_t[:, self.current_inds].flatten('F'), z_tbar[:, self.current_inds].flatten('F'),
+        #                 M, cam_T_imu, mubt[:, self.current_inds])
 
-        # set up Jacobian - 4Nt * 3M
+        # set up Jacobian - 4Nt * (3M+6)
         Nt = np.sum(self.current_inds)
-        Ht = np.zeros((4*Nt, 3*self.M))
+        Ht = np.zeros((4*Nt, 3*self.M + 6))
+
+        # compute Jacobian of landmarks wrt observations
         inds = np.where(self.cur_upds == True)[0]
         # print(inds)
         for i in range(len(inds)):
@@ -191,10 +198,14 @@ class LandMarks(object):
             htii = np.matmul(M, mid)
             Ht[i*4:(i+1)*4, inds[i]*3:(inds[i]+1)*3] = np.copy(htii)
 
+        # obtain jacobian of IMU wrt observations
+        imu_jacob = Imu.get_jacobian(cam_T_imu, mubt[:, self.current_inds], M)
+        Ht[:, -6:] = np.copy(imu_jacob)
+
         # Set up the covariance as a block diagonal
         IV = np.identity(4*Nt)
         sigmaH = np.matmul(self.covs, np.transpose(Ht))
-        assert(sigmaH.shape[0] == 3*self.M)
+        assert(sigmaH.shape[0] == 3*self.M + 6)
         assert(sigmaH.shape[1] == 4*Nt)
         hsh = np.matmul(Ht, sigmaH)
         assert(hsh.shape == (4*Nt, 4*Nt))
@@ -203,9 +214,15 @@ class LandMarks(object):
         assert(inside_inv.shape == (4*Nt, 4*Nt))
         ro = np.linalg.inv(inside_inv)
         mido = np.matmul(np.transpose(Ht), ro)
-        assert(mido.shape == (3*self.M, 4*Nt))
+        assert(mido.shape == (3*self.M+6, 4*Nt))
         Kt = np.matmul(self.covs, mido)
-        assert(Kt.shape == (3*self.M, 4*Nt))
+        assert(Kt.shape == (3*self.M+6, 4*Nt))
+
+        # covariance update
+        ktht = np.matmul(Kt, Ht)
+        assert (ktht.shape == (3 * self.M+6, 3 * self.M+6))
+        I = np.identity(3 * self.M+6)
+        self.covs = np.matmul((I - ktht), self.covs)
 
         # mean update
         flat_zt = z_t[:, self.current_inds].flatten('F')
@@ -219,19 +236,33 @@ class LandMarks(object):
         assert(fzt.shape == (4*Nt, 1))
         assert(fztb.shape == (4*Nt, 1))
         adt = np.matmul(Kt, (fzt - fztb))
-        assert(adt.shape == (3*self.M, 1))
-        self.means += np.copy(adt)
+        assert(adt.shape == (3*self.M+6, 1))
 
-        # covariance update
-        ktht = np.matmul(Kt, Ht)
-        assert(ktht.shape == (3*self.M, 3*self.M))
-        I = np.identity(3*self.M)
-        self.covs = np.matmul((I - ktht), self.covs)
+        # Update IMU Means
+        Imu.ekf_mean_update(adt[-6:, :])
+
+        # Update landmark means
+        self.means += np.copy(adt[:-6, :])
 
     def update(self, z_t, c_mat, cam_T_imu, imu_pose, Imu):
         self._update_inds(z_t)
         self._init_landmarks(z_t, c_mat, cam_T_imu, imu_pose)
         self._update_landmarks(z_t, c_mat, cam_T_imu, imu_pose, Imu)
+
+    def get_imu_cov(self):
+        """
+        Returns the 6*6 covariance matrix of just the IMU
+        :return:
+        """
+        return np.copy(self.covs[-6:, -6:])
+
+    def set_imu_cov(self, imu_cov):
+        """
+        Plugs in the input IMU covariance into the overall combined covariance matrix
+        :param imu_cov: the input IMU covariance, typically after the EKF predict step
+        :return:
+        """
+        self.covs[-6:, -6:] = np.copy(imu_cov)
 
     def get_obs_means(self):
         """

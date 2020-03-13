@@ -212,6 +212,21 @@ class IMU(object):
         assert(Ht.shape == (4*Nt, 6))
         return Ht
 
+    def ekf_mean_update(self, adt):
+        """
+        Performs the update of the IMU mean using EKF update equations
+        :param Kt: the 6*Nt Kalman Gain matrix
+        :param fzt: the first term in innovation
+        :param fztb: the second term in innovation
+        :return:
+        """
+        # Mean update
+        assert (adt.shape == (6, 1))
+        adt = adt.flatten()
+        hat_kz = self.control_hat(adt)
+        exp_kx = expm(hat_kz)
+        self.mean = np.matmul(exp_kx, self.mean)
+
     def update_separate(self, z_t, z_tbar, M, cam_T_imu, landmarks):
         """
         Performs the EKF update step on the IMU mean and Covariance using the input observations and landmarks separately
@@ -259,6 +274,21 @@ class IMU(object):
         assert (ktht.shape == (6, 6))
         I = np.identity(6)
         self.cov = np.matmul((I - ktht), self.cov)
+
+    def get_cov(self):
+        """
+        Returns the current IMU 6*6 covariance matrix
+        :return:
+        """
+        return np.copy(self.cov)
+
+    def set_cov(self, cov):
+        """
+        Set the IMU covariance after the EKF update step, used for the predict step here
+        :param cov: the covariance value to set the IMU covariance to
+        :return:
+        """
+        self.cov = np.copy(cov)
 
     def get_history(self):
         """
